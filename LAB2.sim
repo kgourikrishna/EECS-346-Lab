@@ -1,0 +1,53 @@
+%SIGNAL
+PIN  19 =  GATE 
+PIN  21 =  LATCH1 
+PIN  20 =  LATCH2 
+PIN  23 =  MEM 
+PIN  22 =  RTC 
+PIN   5 =  T0 
+PIN   6 =  T1 
+PIN   2 =  a13 
+PIN   3 =  a14 
+PIN   4 =  a15 
+%END
+
+%FIELD
+%END
+
+%EQUATION
+GATE =>
+    !T1
+  # T0
+
+LATCH1 =>
+    !T0 & !T1
+
+LATCH2 =>
+    T0 & !T1
+
+MEM =>
+    a13
+  # a14
+  # a15
+
+RTC =>
+    !a15
+  # a14
+  # a13
+
+GATE.oe  =>
+    1 
+
+LATCH1.oe  =>
+    1 
+
+LATCH2.oe  =>
+    1 
+
+MEM.oe  =>
+    1 
+
+RTC.oe  =>
+    1 
+
+%END

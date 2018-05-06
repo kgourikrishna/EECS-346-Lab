@@ -1,0 +1,875 @@
+MACRO ASSEMBLER LAB 4                                      06/01/17 16:42:40 PAGE     1
+
+
+DOS MACRO ASSEMBLER MA51 V06.18.15.328
+OBJECT MODULE PLACED IN C:\RAISONANCE\RIDE\EXAMPLES\LAB 4.OBJ
+ASSEMBLER INVOKED BY: QUIET GENERATEDEPFILE EP SYNTAX(ASM51) PR XR PL(60) PW(80) DB OJ(C:\RAISONANCE\RIDE\EXAMPLES\LAB 4.OBJ) PIN(C:\RAISONANCE\RIDE\INC;C:\RAISONANCE\RIDE\INC\51) 
+
+LOC     OBJ           LINE    SOURCE
+                         1     ;Lab 4
+                         2     ;Gourikrishna - 2017_05_14
+                         3     
+                         4     
+                         5     ; Include definitions of standard 8051 registers, bits, etc.
+                         6     $MOD51
+                         7     
+                         8     
+                         9     
+                        10     ; Layout internal data area
+------                  11     DSEG	AT	20H
+                        12     
+                        13     
+                        14     
+                        15     ; Internal variables 
+0020                    16     MIN: 	DS	1
+0021                    17     SEC: 	DS	1
+0022                    18     TIMERCOUNT:  DS   1
+0023                    19     SEGMENTARRAY:  DS 3
+0026                    20     TIMEARRAY:  DS 4
+002A                    21     KEYPRESSCOUNT:  DS 1
+002B                    22     COLUMN1:  DS 1
+002C                    23     COLUMN2:  DS 1
+002D                    24     COLUMN3:  DS 1
+002E                    25     KEYVALUE:  DS 1
+002F                    26     ADCARRAY:  DS 4
+0033                    27     CHANNELNUMBER:  DS 1
+                        28     
+                        29     
+                        30     
+                        31     ;set up stk area for call and interrupt functions
+0034                    32     STKAREA: 	DS	32
+                        33     
+                        34     
+                        35     
+                        36     
+                        37     
+                        38     ; Lay out external data memory
+------                  39     XSEG	AT	8000H
+                        40     
+8000                    41     RTCSC: 		DS	1
+8001                    42     RTCSCAL:  	DS	1
+8002                    43     RTCMN: 		DS	1
+8003                    44     RTCMNAL:  	DS	1
+8004                    45     RTCHR: 		DS	1
+8005                    46     RTCHRAL:  	DS	1
+8006                    47     RTCDAY: 		DS	1
+8007                    48     RTCDATE:  	DS	1
+8008                    49     RTCMON: 		DS	1
+8009                    50     RTCYR: 	 	DS	1
+MACRO ASSEMBLER LAB 4                            06/01/17  16:42:40 PAGE     2
+                     
+800A                    51     RTCA: 		DS	1
+800B                    52     RTCB:  		DS	1
+800C                    53     RTCC: 		DS	1
+800D                    54     RTCD:  		DS	1
+                        55     
+                        56     
+                        57     
+                        58     
+                        59     
+                        60     ; Code space
+------                  61     CSEG	AT	0
+                        62     
+0000    020040          63     START: 	LJMP	INIT	; Jump around interrupt handlers
+                        64     
+                        65     
+                        66     
+                        67     ; Interrupt handlers
+                        68     
+------                  69     CSEG	AT	0003H
+                        70     ; External 0
+0003    32              71     	RETI		;end of external 0 interrupt handler
+                        72     
+                        73     
+------                  74     CSEG	AT	000BH
+                        75     ;Timer 0 interrupt function
+000B    01B4            76     	AJMP	T0INT		;jump to timer 0 interrupt function
+                        77     
+                        78     
+------                  79     CSEG	AT	0013H
+                        80     ;External 1 - should never happen.
+0013    32              81     	RETI		;end of external 1 interrupt handler
+                        82     
+                        83     
+------                  84     CSEG	AT	001BH
+                        85     ;Timer 1 - should never happen
+001B    32              86     	RETI		;end of timer 1 interrupt handler
+                        87     
+                        88     
+------                  89     CSEG	AT	0023H
+                        90     ;Serial
+0023    C299            91     	CLR		TI
+0025    C298            92     	CLR		RI
+0027    32              93     	RETI		;end of serial interrupt handler
+                        94     
+                        95     
+                        96     
+                        97     
+                        98     
+                        99     
+------                 100     CSEG	AT	40H
+                       101     ; Main body of code.
+                       102     
+                       103     ; Initializations.
+                       104     INIT: 
+0040    758134         105         MOV	SP, #STKAREA	;set up stack area
+                       106         
+0043    90800A         107         MOV    DPTR,#RTCA       
+MACRO ASSEMBLER LAB 4                            06/01/17  16:42:40 PAGE     3
+                     
+0046    7420           108         MOV A,#00100000B     
+0048    F0             109         MOVX  @DPTR,A    
+                       110     
+0049    90800B         111         MOV DPTR, #RTCB
+004C    7404           112         MOV A, #00000100B
+004E    F0             113         MOVX @DPTR,A
+                       114         
+                       115     ;Initialize variables
+004F    752200         116     	MOV TIMERCOUNT, #0
+0052    752A00         117         MOV KEYPRESSCOUNT, #0
+0055    752E00         118         MOV KEYVALUE, #0
+0058    753300         119         MOV CHANNELNUMBER, #0
+                       120         
+                       121     
+                       122     ; Set up timers.
+005B    758A00         123     	MOV	TL0,#0			    ;Timer 0 init to 0
+005E    758C00         124     	MOV	TH0,#0
+                       125     
+0061    758901         126         MOV	TMOD,#00000001B		;Timer 0 in 8-bit auto reload mode
+                       127                                 ;internal clock mode
+0064    758810         128     	MOV	TCON,#00010000B		    ;timer 0 running
+                       129     
+                       130     
+                       131     
+                       132     ;Set up interrupt system only after all else is set up
+0067    75A882         133     	MOV	IE,#10000010B		; timer0 interrupt
+                       134     
+                       135     LOOP: 
+006A    51F7           136         ACALL READADC
+006C    3102           137         ACALL READ	
+                       138         
+006E    7826           139         MOV R0,#TIMEARRAY	      
+0070    E521           140         MOV A,SEC
+0072    11F8           141         ACALL CONVERT
+0074    E520           142         MOV A, MIN 
+0076    11F8           143         ACALL CONVERT
+                       144         
+0078    3132           145         ACALL KEYBOARDREAD
+                       146         
+007A    782F           147         MOV R0, #ADCARRAY
+                       148         
+007C    7400           149         MOV A, #0
+007E    B52E06         150         CJNE A, KEYVALUE, ADC1
+0081    E6             151         MOV A, @R0
+0082    51E5           152         ACALL CONVERTADC
+0084    0200B0         153         JMP DISPLAY
+                       154         
+                       155         ADC1: 
+0087    7401           156         MOV A, #1
+0089    B52E07         157         CJNE A, KEYVALUE, ADC2
+008C    08             158         INC R0
+008D    E6             159         MOV A, @R0
+008E    51E5           160         ACALL CONVERTADC
+0090    0200B0         161         JMP DISPLAY
+                       162         
+                       163         ADC2: 
+0093    7402           164         MOV A, #2
+MACRO ASSEMBLER LAB 4                            06/01/17  16:42:40 PAGE     4
+                     
+0095    B52E08         165         CJNE A, KEYVALUE, ADC3
+0098    08             166         INC R0
+0099    08             167         INC R0
+009A    E6             168         MOV A, @R0
+009B    51E5           169         ACALL CONVERTADC
+009D    0200B0         170         JMP DISPLAY
+                       171         
+                       172         ADC3: 
+00A0    7403           173         MOV A, #3
+00A2    B52E09         174         CJNE A, KEYVALUE, TIME
+00A5    08             175         INC R0
+00A6    08             176         INC R0
+00A7    08             177         INC R0
+00A8    E6             178         MOV A, @R0
+00A9    51E5           179         ACALL CONVERTADC
+00AB    0200B0         180         JMP DISPLAY
+                       181     
+                       182     TIME: 
+00AE    310F           183         ACALL TRANSFER
+                       184      
+                       185     ;movekeypress:
+                       186     ;   mov r0, #segmentarray
+                       187     ;    inc r0
+                       188     ;    inc r0
+                       189     ;    mov @r0, keypresscount
+                       190     ;    jmp cont
+                       191         
+                       192     ;offcheck:  
+                       193     ;    CJNE a, #0, increment
+                       194     ;    mov keyvalue, #0
+                       195     ;    jmp movekeypress
+                       196     
+                       197     ;increment:
+                       198     ;    mov keyvalue, a
+                       199     ;    inc keypresscount
+                       200     ;    mov a, keypresscount
+                       201     ;    CJNE a,#10, movekeypress
+                       202     ;    mov keypresscount,#0
+                       203     ;    jmp movekeypress
+                       204     
+                       205     ;cont:
+                       206         ;acall transfer
+                       207     DISPLAY: 
+00B0    11CC           208         ACALL DSP
+                       209     	
+                       210     LOOP1: 
+00B2    80B6           211     	SJMP	LOOP
+                       212     
+                       213     
+                       214     
+                       215     ; Timer 0 overflow interrupt handler
+                       216     T0INT: 
+00B4    C0E0           217         PUSH    ACC
+00B6    C0D0           218         PUSH    PSW
+00B8    0522           219         INC     TIMERCOUNT
+00BA    E522           220         MOV     A,TIMERCOUNT
+00BC    B40308         221     	CJNE    A,#3,CONTINUE
+MACRO ASSEMBLER LAB 4                            06/01/17  16:42:40 PAGE     5
+                     
+00BF    752200         222         MOV     TIMERCOUNT,#0
+00C2    D0D0           223         POP     PSW
+00C4    D0E0           224         POP     ACC
+00C6    32             225         RETI
+                       226     
+                       227     CONTINUE: 
+00C7    D0D0           228         POP PSW
+00C9    D0E0           229         POP ACC
+00CB    32             230         RETI
+                       231     
+                       232     	
+                       233     	; Display function
+                       234     DSP: 	
+00CC    7423           235     	MOV A, #SEGMENTARRAY
+00CE    2522           236     	ADD A, TIMERCOUNT
+                       237         
+00D0    F8             238     	MOV R0, A
+00D1    E6             239     	MOV A, @R0
+00D2    FB             240         MOV R3,A
+                       241         
+00D3    7400           242     	MOV A,#0
+00D5    B52206         243     	CJNE  A,TIMERCOUNT,CASE1
+00D8    EB             244         MOV A, R3
+00D9    4440           245     	ORL A,#01000000B
+00DB    0200EF         246     	JMP NEXT
+                       247         
+                       248         CASE1: 
+00DE    7401           249             MOV A,#1
+00E0    B52206         250             CJNE  A,TIMERCOUNT, CASE2
+00E3    EB             251             MOV A, R3
+00E4    4420           252     		ORL A,#00100000B
+00E6    0200EF         253     		JMP NEXT
+                       254         
+                       255         CASE2: 
+00E9    EB             256             MOV A, R3
+00EA    4410           257     		ORL A, #00010000B
+00EC    0200EF         258     		JMP NEXT
+                       259     
+                       260     	NEXT: 
+00EF    F590           261             MOV P1, A
+00F1    53B0CF         262     		ANL P3, #11001111B
+00F4    43B030         263     		ORL P3, #00110000B
+00F7    22             264     		RET
+                       265                 
+                       266     CONVERT: 
+00F8    75F00A         267         MOV B, #10
+00FB    84             268         DIV AB
+00FC    A6F0           269         MOV @R0, B
+00FE    08             270         INC R0
+00FF    F6             271         MOV @R0, A
+0100    08             272         INC R0
+0101    22             273         RET
+                       274     
+                       275     
+                       276     READ: 
+0102    908000         277         MOV DPTR, #RTCSC
+0105    E0             278         MOVX A, @DPTR
+MACRO ASSEMBLER LAB 4                            06/01/17  16:42:40 PAGE     6
+                     
+0106    F521           279         MOV SEC,A
+                       280         
+0108    908002         281         MOV DPTR, #RTCMN
+010B    E0             282         MOVX, A, @DPTR
+010C    F520           283         MOV MIN, A
+010E    22             284         RET
+                       285         
+                       286         
+                       287     TRANSFER: 
+010F    7826           288         MOV R0,#TIMEARRAY
+0111    E6             289         MOV A, @R0
+0112    7823           290         MOV R0, #SEGMENTARRAY
+0114    F6             291         MOV @R0,A
+                       292         
+0115    7426           293         MOV A,#TIMEARRAY
+0117    2401           294         ADD A,#1
+0119    F8             295         MOV R0,A
+011A    86F0           296         MOV B, @R0
+011C    7423           297         MOV A, #SEGMENTARRAY
+011E    2401           298         ADD A, #1
+0120    F8             299         MOV R0,A
+0121    A6F0           300         MOV @R0,B
+                       301         
+0123    7426           302         MOV A,#TIMEARRAY
+0125    2402           303         ADD A,#2
+0127    F8             304         MOV R0,A
+0128    86F0           305         MOV B, @R0
+012A    7423           306         MOV A, #SEGMENTARRAY
+012C    2402           307         ADD A, #2
+012E    F8             308         MOV R0,A
+012F    A6F0           309         MOV @R0,B
+                       310       
+0131    22             311         RET
+                       312         
+                       313     KEYBOARDREAD: 
+0132    75F000         314        MOV B, #0
+0135    3175           315        ACALL COLUMN1READ
+0137    F52B           316        MOV COLUMN1, A
+0139    318A           317        ACALL COLUMN2READ
+013B    F52C           318        MOV COLUMN2, A
+013D    319F           319        ACALL COLUMN3READ
+013F    F52D           320        MOV COLUMN3, A
+0141    02015C         321        JMP CHECK
+                       322     
+                       323     RESET1: 
+0144    F52B           324         MOV COLUMN1,A
+0146    75F000         325         MOV B,#0
+0149    02015C         326         JMP CHECK
+                       327     
+                       328     RESET2: 
+014C    F52C           329         MOV COLUMN2, A
+014E    75F000         330         MOV B, #0
+0151    02015C         331         JMP CHECK
+                       332         
+                       333     RESET3: 
+0154    F52D           334         MOV COLUMN3, A
+0156    75F000         335         MOV B, #0
+MACRO ASSEMBLER LAB 4                            06/01/17  16:42:40 PAGE     7
+                     
+0159    02015C         336         JMP CHECK
+                       337     
+                       338     CHECK:    
+015C    3175           339        ACALL COLUMN1READ
+015E    B52BE3         340        CJNE A,COLUMN1,RESET1
+0161    318A           341        ACALL COLUMN2READ
+0163    B52CE6         342        CJNE A, COLUMN2, RESET2
+0166    319F           343        ACALL COLUMN3READ
+0168    B52DE9         344        CJNE A,COLUMN3, RESET3
+016B    05F0           345        INC B
+016D    E5F0           346        MOV A,B
+016F    B40AEA         347        CJNE A, #10, CHECK
+0172    0201B4         348        JMP PROCEED
+                       349        
+                       350     COLUMN1READ: 
+0175    759004         351        MOV P1, #00000100B
+0178    53B0EF         352        ANL P3, #11101111B
+017B    43B010         353        ORL P3, #00010000B
+                       354        
+017E    7590FF         355        MOV P1, #11111111B
+                       356        
+0181    53B0DF         357        ANL P3, #11011111B
+0184    E590           358        MOV A, P1
+0186    43B020         359        ORL P3, #00100000B
+                       360        
+0189    22             361        RET
+                       362        
+                       363     COLUMN2READ: 
+018A    759002         364        MOV P1, #00000010B
+018D    53B0EF         365        ANL P3, #11101111B
+0190    43B010         366        ORL P3, #00010000B
+                       367        
+0193    7590FF         368        MOV P1, #11111111B
+                       369     
+0196    53B0DF         370        ANL P3, #11011111B
+0199    E590           371        MOV A, P1
+019B    43B020         372        ORL P3, #00100000B
+                       373        
+019E    22             374        RET
+                       375        
+                       376     COLUMN3READ: 
+019F    759001         377        MOV P1, #00000001B
+01A2    53B0EF         378        ANL P3, #11101111B
+01A5    43B010         379        ORL P3, #00010000B
+                       380        
+01A8    7590FF         381        MOV P1, #11111111B
+                       382        
+01AB    53B0DF         383        ANL P3, #11011111B
+01AE    E590           384        MOV A, P1
+01B0    43B020         385        ORL P3, #00100000B
+                       386        
+01B3    22             387        RET
+                       388        
+                       389     PROCEED:    
+                       390          
+01B4    E52B           391        MOV A, COLUMN1
+01B6    B48F04         392        CJNE A,#10001111B, FOUR
+MACRO ASSEMBLER LAB 4                            06/01/17  16:42:40 PAGE     8
+                     
+01B9    752E01         393        MOV KEYVALUE,#1
+                       394     ;   mov r0, #segmentarray
+                       395     ;   mov @r0, #1
+                       396     ;   inc r0
+                       397     ;   mov @r0, #0
+01BC    22             398        RET
+                       399     
+                       400     FOUR: 
+01BD    E52B           401         MOV A,COLUMN1
+01BF    B49704         402         CJNE A,#10010111B, SEVEN
+01C2    752E04         403         MOV KEYVALUE, #4
+                       404     ;    mov r0, #segmentarray
+                       405     ;    mov @r0, #4
+                       406     ;    inc r0
+                       407     ;    mov @r0, #0
+01C5    22             408         RET
+                       409     
+                       410     SEVEN: 
+01C6    E52B           411         MOV A,COLUMN1
+01C8    B4A704         412         CJNE A, #10100111B, TEN
+01CB    752E07         413         MOV KEYVALUE, #7
+                       414     ;    mov r0, #segmentarray
+                       415     ;    mov @r0, #7
+                       416     ;    inc r0
+                       417     ;    mov @r0, #0
+01CE    22             418         RET
+                       419     
+                       420     TEN: 
+01CF    E52B           421         MOV A,COLUMN1
+01D1    B4C704         422         CJNE A, #11000111B, TWO
+01D4    752E0A         423         MOV KEYVALUE, #10
+                       424     ;    mov r0, #segmentarray
+                       425     ;    mov @r0, #0
+                       426     ;    inc r0
+                       427     ;    mov @r0, #1
+01D7    22             428         RET
+                       429     
+                       430     TWO: 
+01D8    E52C           431         MOV A,COLUMN2
+01DA    B48F04         432         CJNE A,#10001111B, FIVE
+01DD    752E02         433         MOV KEYVALUE, #2
+                       434     ;    mov r0, #segmentarray
+                       435     ;    mov @r0, #2
+                       436     ;    inc r0
+                       437     ;    mov @r0, #0
+01E0    22             438         RET
+                       439        
+                       440     FIVE: 
+01E1    E52C           441         MOV A,COLUMN2
+01E3    B49704         442         CJNE A,#10010111B, EIGHT
+01E6    752E05         443         MOV KEYVALUE, #5
+                       444     ;    mov r0, #segmentarray
+                       445     ;    mov @r0, #5
+                       446     ;    inc r0
+                       447     ;    mov @r0, #0
+01E9    22             448         RET
+                       449     
+MACRO ASSEMBLER LAB 4                            06/01/17  16:42:40 PAGE     9
+                     
+                       450     EIGHT: 
+01EA    E52C           451         MOV A,COLUMN2
+01EC    B4A704         452         CJNE A,#10100111B, ZERO
+01EF    752E08         453         MOV KEYVALUE, #8
+                       454     ;    mov r0, #segmentarray
+                       455     ;    mov @r0, #8
+                       456     ;    inc r0
+                       457     ;    mov @r0, #0
+01F2    22             458         RET
+                       459     
+                       460     ZERO: 
+01F3    E52C           461         MOV A,COLUMN2
+01F5    B4C704         462         CJNE A,#11000111B, THREE
+01F8    752E00         463         MOV, KEYVALUE, #0
+                       464     ;    mov r0, #segmentarray
+                       465     ;    mov @r0, #0
+                       466     ;    inc r0
+                       467     ;    mov @r0, #0
+01FB    22             468         RET
+                       469         
+                       470     THREE: 
+01FC    E52D           471         MOV A,COLUMN3
+01FE    B48F04         472         CJNE A, #10001111B, SIX
+0201    752E03         473         MOV KEYVALUE, #3
+                       474     ;    mov r0, #segmentarray
+                       475     ;    mov @r0, #3
+                       476     ;    inc r0
+                       477     ;    mov @r0, #0
+0204    22             478         RET
+                       479     
+                       480     SIX: 
+0205    E52D           481         MOV A,COLUMN3
+0207    B49704         482         CJNE A, #10010111B, NINE
+020A    752E06         483         MOV KEYVALUE, #6
+                       484     ;    mov r0, #segmentarray
+                       485     ;    mov @r0, #6
+                       486     ;    inc r0
+                       487     ;    mov @r0, #0
+020D    22             488         RET
+                       489     
+                       490     NINE: 
+020E    E52D           491         MOV A, COLUMN3
+0210    B4A704         492         CJNE A, #10100111B, ELEVEN
+0213    752E09         493         MOV KEYVALUE, #9
+                       494     ;    mov r0, #segmentarray
+                       495     ;    mov @r0, #9
+                       496     ;    inc r0
+                       497     ;    mov @r0, #0
+0216    22             498         RET
+                       499     
+                       500     ELEVEN: 
+0217    F52D           501         MOV COLUMN3, A
+0219    B4C704         502         CJNE A, #11000111B, DONE
+021C    752E0B         503         MOV KEYVALUE, #11
+                       504     ;    mov r0, #segmentarray
+                       505     ;    mov @r0, #1
+                       506     ;    inc r0
+MACRO ASSEMBLER LAB 4                            06/01/17  16:42:40 PAGE    10
+                     
+                       507     ;    mov @r0, #1
+021F    22             508         RET
+                       509     
+                       510     DONE: 
+0220    22             511         RET
+                       512         
+                       513     WAIT: 
+0221    00             514         NOP
+0222    00             515         NOP
+0223    00             516         NOP
+0224    00             517         NOP
+0225    00             518         NOP
+0226    22             519         RET
+                       520         
+                       521     IICSTART: 
+0227    53B0F7         522         ANL P3, #11110111B
+022A    5121           523         ACALL WAIT
+022C    53B0FB         524         ANL P3, #11111011B
+022F    5121           525         ACALL WAIT
+0231    22             526         RET
+                       527     
+                       528     IICSTOP: 
+0232    53B0F7         529         ANL P3, #11110111B
+0235    5121           530         ACALL WAIT
+0237    43B004         531         ORL P3, #00000100B
+023A    5121           532         ACALL WAIT
+023C    43B008         533         ORL P3, #00001000B
+023F    5121           534         ACALL WAIT
+0241    22             535         RET
+                       536         
+                       537     WRITEIIC: 
+                       538     
+0242    7C08           539     MOV R4, #8
+                       540     
+                       541     LOOP1CHECK: 
+0244    F5F0           542     MOV B, A
+0246    EC             543     MOV A,R4
+0247    B40003         544     CJNE A,#0,LOOPONE
+024A    020272         545     JMP FINISHTRANSFER
+                       546     
+                       547     LOOPONE: 
+024D    E5F0           548         MOV A,B
+024F    5480           549         ANL A, #10000000B
+0251    B48006         550         CJNE A,#10000000B, SDALOW
+0254    43B008         551         ORL P3, #00001000B
+0257    02025D         552         JMP LOOP1CONTINUE
+                       553         
+                       554         SDALOW: 
+025A    53B0F7         555            ANL P3, #11110111B
+                       556            
+                       557         LOOP1CONTINUE: 
+025D    43B004         558            ORL P3, #00000100B
+0260    5121           559            ACALL WAIT
+0262    53B0FB         560            ANL P3, #11111011B
+0265    43B008         561            ORL P3, #00001000B
+                       562     
+0268    5121           563            ACALL WAIT
+MACRO ASSEMBLER LAB 4                            06/01/17  16:42:40 PAGE    11
+                     
+026A    E5F0           564            MOV A, B
+026C    23             565            RL A
+026D    F5F0           566            MOV B, A
+026F    1C             567            DEC R4
+0270    80D2           568            JMP LOOP1CHECK
+                       569     
+                       570     FINISHTRANSFER: 
+0272    E5F0           571         MOV A, B
+0274    43B004         572         ORL P3, #00000100B 
+0277    5121           573         ACALL WAIT
+0279    53B0FB         574         ANL P3, #11111011B
+027C    5121           575         ACALL WAIT
+027E    22             576         RET
+                       577     
+                       578     READIIC: 
+027F    7400           579         MOV A, #0
+0281    43B008         580         ORL P3, #00001000B
+0284    7C08           581         MOV R4, #8
+                       582         
+                       583         LOOP2CHECK: 
+0286    F5F0           584         MOV B, A
+0288    EC             585         MOV A,R4
+0289    B40003         586         CJNE A,#0,LOOP2
+028C    0202A8         587         JMP LOOP2FINISH
+                       588     
+                       589         LOOP2: 
+028F    43B004         590             ORL P3, #00000100B
+0292    5121           591             ACALL WAIT
+0294    E5F0           592             MOV A, B
+0296    23             593             RL A
+0297    F5F0           594             MOV B, A
+                       595             ;mov a, P3
+                       596             ;anl a,#00001000b
+0299    30B302         597             JNB P3.3, DONOTHING
+                       598             ;CJNE a,#00001000b, donothing
+                       599             ;mov a,b
+029C    4401           600             ORL A,#00000001B
+                       601             
+                       602             DONOTHING: 
+029E    53B0FB         603                 ANL P3, #11111011B
+02A1    5121           604                 ACALL WAIT
+02A3    F5F0           605                 MOV B, A
+02A5    1C             606                 DEC R4
+02A6    80DE           607                 JMP LOOP2CHECK
+                       608                 
+                       609         LOOP2FINISH: 
+02A8    EB             610             MOV A, R3
+02A9    B40106         611             CJNE A, #1, SDAHIGH
+02AC    53B0F7         612             ANL P3, #11110111B
+02AF    0202B5         613             JMP LOOP2CONTINUE
+                       614             
+                       615             SDAHIGH: 
+02B2    43B008         616                 ORL P3, #00001000B
+                       617             
+                       618             LOOP2CONTINUE:         
+02B5    43B004         619                 ORL P3, #00000100B
+02B8    5121           620                 ACALL WAIT
+MACRO ASSEMBLER LAB 4                            06/01/17  16:42:40 PAGE    12
+                     
+02BA    53B0FB         621                 ANL P3, #11111011B
+02BD    43B008         622                 ORL P3, #00001000B
+02C0    5121           623                 ACALL WAIT
+02C2    E5F0           624                 MOV A, B
+02C4    22             625                 RET
+                       626                 
+                       627     
+                       628     GETADC: 
+02C5    AA33           629         MOV R2, CHANNELNUMBER
+02C7    5127           630         ACALL IICSTART
+02C9    7490           631         MOV A, #90H
+02CB    5142           632         ACALL WRITEIIC
+02CD    EA             633         MOV A, R2
+02CE    5403           634         ANL A, #00000011B
+02D0    5142           635         ACALL WRITEIIC
+02D2    5132           636         ACALL IICSTOP
+                       637         
+02D4    5127           638         ACALL IICSTART
+02D6    7491           639         MOV A, #91H
+02D8    5142           640         ACALL WRITEIIC
+02DA    7B01           641         MOV R3, #1
+02DC    517F           642         ACALL READIIC
+02DE    7B00           643         MOV R3, #0
+02E0    517F           644         ACALL READIIC
+02E2    5132           645         ACALL IICSTOP
+02E4    22             646         RET
+                       647         
+                       648     CONVERTADC: 
+02E5    7823           649         MOV R0, #SEGMENTARRAY
+02E7    75F00A         650         MOV B, #10
+02EA    84             651         DIV AB
+02EB    A6F0           652         MOV @R0, B
+02ED    08             653         INC R0
+02EE    75F00A         654         MOV B, #10
+02F1    84             655         DIV AB
+02F2    A6F0           656         MOV @R0, B
+02F4    08             657         INC R0
+02F5    F6             658         MOV @R0, A
+02F6    22             659         RET
+                       660     
+                       661     READADC: 
+02F7    753300         662         MOV CHANNELNUMBER, #0
+02FA    782F           663         MOV R0, #ADCARRAY
+02FC    51C5           664         ACALL GETADC
+02FE    F6             665         MOV @R0, A
+02FF    08             666         INC R0
+0300    753301         667         MOV CHANNELNUMBER, #1
+0303    51C5           668         ACALL GETADC
+0305    F6             669         MOV @R0, A
+0306    08             670         INC R0
+0307    753302         671         MOV CHANNELNUMBER, #2
+030A    51C5           672         ACALL GETADC
+030C    F6             673         MOV @R0, A
+030D    08             674         INC R0
+030E    753303         675         MOV CHANNELNUMBER, #3
+0311    51C5           676         ACALL GETADC
+0313    F6             677         MOV @R0, A
+MACRO ASSEMBLER LAB 4                            06/01/17  16:42:40 PAGE    13
+                     
+0314    22             678         RET
+                       679         
+                       680     	END	START
+MACRO ASSEMBLER LAB 4                                      06/01/17 16:42:40 PAGE     0
+
+
+SYMBOL TABLE LISTING
+------ ----- -------
+
+
+N A M E             T Y P E  V A L U E   ATTRIBUTES             REFERENCES
+
+WRITEIIC . . . . .  C ADDR   0242H   A                          537# 632 635 640 
+                                                                
+ZERO . . . . . . .  C ADDR   01F3H   A                          452 460# 
+COLUMN2. . . . . .  D ADDR   002CH   A                          23# 318 329 342 431 
+                                                                441 451 461 
+SEVEN. . . . . . .  C ADDR   01C6H   A                          402 410# 
+CONVERT. . . . . .  C ADDR   00F8H   A                          141 143 266# 
+COLUMN3. . . . . .  D ADDR   002DH   A                          24# 320 334 344 471 
+                                                                481 491 501 
+P1 . . . . . . . .  D ADDR   0090H   A                          6# 261 351 355 358 
+                                                                364 368 371 377 381 
+                                                                384 
+PROCEED. . . . . .  C ADDR   01B4H   A                          348 389# 
+CHANNELNUMBER. . .  D ADDR   0033H   A                          27# 119 629 662 667 
+                                                                671 675 
+B. . . . . . . . .  D ADDR   00F0H   A                          6# 267 269 296 300 
+                                                                305 309 314 325 330 
+                                                                335 345 346 542 548 
+                                                                564 566 571 584 592 
+                                                                594 605 624 650 652 
+                                                                654 656 
+IICSTART . . . . .  C ADDR   0227H   A                          521# 630 638 
+RTCHR. . . . . . .  X ADDR   8004H   A                          45# 
+P3 . . . . . . . .  D ADDR   00B0H   A                          6# 262 263 352 353 
+                                                                357 359 365 366 370 
+                                                                372 378 379 383 385 
+                                                                522 524 529 531 533 
+                                                                551 555 558 560 561 
+                                                                572 574 580 590 597 
+                                                                603 612 616 619 621 
+                                                                622 
+SP . . . . . . . .  D ADDR   0081H   A                          6# 105 
+READADC. . . . . .  C ADDR   02F7H   A                          136 661# 
+RTCMN. . . . . . .  X ADDR   8002H   A                          43# 281 
+MIN. . . . . . . .  D ADDR   0020H   A                          16# 142 283 
+CONTINUE . . . . .  C ADDR   00C7H   A                          221 227# 
+TRANSFER . . . . .  C ADDR   010FH   A                          183 287# 
+FINISHTRANSFER . .  C ADDR   0272H   A                          545 570# 
+DONE . . . . . . .  C ADDR   0220H   A                          502 510# 
+KEYVALUE . . . . .  D ADDR   002EH   A                          25# 118 150 157 165 
+                                                                174 393 403 413 423 
+                                                                433 443 453 463 473 
+                                                                483 493 503 
+TEN. . . . . . . .  C ADDR   01CFH   A                          412 420# 
+DSP. . . . . . . .  C ADDR   00CCH   A                          208 234# 
+RTCDATE. . . . . .  X ADDR   8007H   A                          48# 
+RTCDAY . . . . . .  X ADDR   8006H   A                          47# 
+ADCARRAY . . . . .  D ADDR   002FH   A                          26# 147 663 
+ACC. . . . . . . .  D ADDR   00E0H   A                          6# 217 224 229 
+GETADC . . . . . .  C ADDR   02C5H   A                          628# 664 668 672 
+                                                                676 
+LOOP1CHECK . . . .  C ADDR   0244H   A                          541# 568 
+CONVERTADC . . . .  C ADDR   02E5H   A                          152 160 169 179 648# 
+                                                                
+DONOTHING. . . . .  C ADDR   029EH   A                          597 602# 
+LOOP2CHECK . . . .  C ADDR   0286H   A                          583# 607 
+SDALOW . . . . . .  C ADDR   025AH   A                          550 554# 
+NINE . . . . . . .  C ADDR   020EH   A                          482 490# 
+FIVE . . . . . . .  C ADDR   01E1H   A                          432 440# 
+RTCA . . . . . . .  X ADDR   800AH   A                          51# 107 
+TIMERCOUNT . . . .  D ADDR   0022H   A                          18# 116 219 220 222 
+                                                                236 243 250 
+LOOP1. . . . . . .  C ADDR   00B2H   A                          210# 
+RTCB . . . . . . .  X ADDR   800BH   A                          52# 111 
+STKAREA. . . . . .  D ADDR   0034H   A                          32# 105 
+LOOP2. . . . . . .  C ADDR   028FH   A                          586 589# 
+RTCC . . . . . . .  X ADDR   800CH   A                          53# 
+RTCSCAL. . . . . .  X ADDR   8001H   A                          42# 
+TH0. . . . . . . .  D ADDR   008CH   A                          6# 124 
+LOOP2FINISH. . . .  C ADDR   02A8H   A                          587 609# 
+CASE1. . . . . . .  C ADDR   00DEH   A                          243 248# 
+KEYBOARDREAD . . .  C ADDR   0132H   A                          145 313# 
+RTCD . . . . . . .  X ADDR   800DH   A                          54# 
+CASE2. . . . . . .  C ADDR   00E9H   A                          250 255# 
+START. . . . . . .  C ADDR   0000H   A                          63# 
+TIMEARRAY. . . . .  D ADDR   0026H   A                          20# 139 288 293 302 
+                                                                
+IE . . . . . . . .  D ADDR   00A8H   A                          6# 133 
+TIME . . . . . . .  C ADDR   00AEH   A                          174 182# 
+T0INT. . . . . . .  C ADDR   00B4H   A                          76 216# 
+LOOP1CONTINUE. . .  C ADDR   025DH   A                          552 557# 
+RTCHRAL. . . . . .  X ADDR   8005H   A                          46# 
+TL0. . . . . . . .  D ADDR   008AH   A                          6# 123 
+LOOP2CONTINUE. . .  C ADDR   02B5H   A                          613 618# 
+MACRO ASSEMBLER LAB 4                                      06/01/17 16:42:40 PAGE     1
+
+
+DOS MACRO ASSEMBLER MA51 V06.18.15.328
+OBJECT MODULE PLACED IN C:\RAISONANCE\RIDE\EXAMPLES\LAB 4.OBJ
+ASSEMBLER INVOKED BY: QUIET GENERATEDEPFILE EP SYNTAX(ASM51) PR XR PL(60) PW(80) DB OJ(C:\RAISONANCE\RIDE\EXAMPLES\LAB 4.OBJ) PIN(C:\RAISONANCE\RIDE\INC;C:\RAISONANCE\RIDE\INC\51) 
+
+LOC     OBJ           LINE    SOURCE
+READIIC. . . . . .  C ADDR   027FH   A                          578# 642 644 
+EIGHT. . . . . . .  C ADDR   01EAH   A                          442 450# 
+RTCMNAL. . . . . .  X ADDR   8003H   A                          44# 
+SEGMENTARRAY . . .  D ADDR   0023H   A                          19# 235 290 297 306 
+                                                                649 
+RTCMON . . . . . .  X ADDR   8008H   A                          49# 
+SIX. . . . . . . .  C ADDR   0205H   A                          472 480# 
+RESET1 . . . . . .  C ADDR   0144H   A                          323# 340 
+INIT . . . . . . .  C ADDR   0040H   A                          63 104# 
+RTCYR. . . . . . .  X ADDR   8009H   A                          50# 
+TMOD . . . . . . .  D ADDR   0089H   A                          6# 126 
+TCON . . . . . . .  D ADDR   0088H   A                          6# 128 
+WAIT . . . . . . .  C ADDR   0221H   A                          513# 523 525 530 
+                                                                532 534 559 563 573 
+                                                                575 591 604 620 623 
+                                                                
+RESET2 . . . . . .  C ADDR   014CH   A                          328# 342 
+RESET3 . . . . . .  C ADDR   0154H   A                          333# 344 
+DISPLAY. . . . . .  C ADDR   00B0H   A                          153 161 170 180 207# 
+                                                                
+SDAHIGH. . . . . .  C ADDR   02B2H   A                          611 615# 
+THREE. . . . . . .  C ADDR   01FCH   A                          462 470# 
+ADC1 . . . . . . .  C ADDR   0087H   A                          150 155# 
+TWO. . . . . . . .  C ADDR   01D8H   A                          422 430# 
+ADC2 . . . . . . .  C ADDR   0093H   A                          157 163# 
+LOOP . . . . . . .  C ADDR   006AH   A                          135# 211 
+PSW. . . . . . . .  D ADDR   00D0H   A                          6# 218 223 228 
+IICSTOP. . . . . .  C ADDR   0232H   A                          528# 636 645 
+COLUMN1READ. . . .  C ADDR   0175H   A                          315 339 350# 
+ADC3 . . . . . . .  C ADDR   00A0H   A                          165 172# 
+SEC. . . . . . . .  D ADDR   0021H   A                          17# 140 279 
+RI . . . . . . . .  B ADDR   0098H.0 A                          6# 92 
+LOOPONE. . . . . .  C ADDR   024DH   A                          544 547# 
+FOUR . . . . . . .  C ADDR   01BDH   A                          392 400# 
+COLUMN2READ. . . .  C ADDR   018AH   A                          317 341 363# 
+READ . . . . . . .  C ADDR   0102H   A                          137 276# 
+COLUMN3READ. . . .  C ADDR   019FH   A                          319 343 376# 
+TI . . . . . . . .  B ADDR   0098H.1 A                          6# 91 
+CHECK. . . . . . .  C ADDR   015CH   A                          321 326 331 336 338# 
+                                                                347 
+ELEVEN . . . . . .  C ADDR   0217H   A                          492 500# 
+NEXT . . . . . . .  C ADDR   00EFH   A                          246 253 258 260# 
+                                                                
+RTCSC. . . . . . .  X ADDR   8000H   A                          41# 277 
+COLUMN1. . . . . .  D ADDR   002BH   A                          22# 316 324 340 391 
+                                                                401 411 421 
+KEYPRESSCOUNT. . .  D ADDR   002AH   A                          21# 117 
+
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    738    ----
+   XDATA SIZE       =     14    ----
+   DATA SIZE        =     52    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+REGISTER BANK(S) USED : 0 
+
+ASSEMBLY COMPLETE.   0 WARNING(S)   0 ERROR(S)
